@@ -1,0 +1,32 @@
+const mongoose=require("mongoose");
+const careerSchema=new mongoose.Schema(
+{
+    name:{
+        type:String,
+        required:true
+    },
+    description:{
+        type:String,
+        required:true
+    },
+    industry:{
+        type:String,
+        required:true
+    },
+    salary:{
+        type:String,
+        default:""
+    },
+    opportunity:{
+        type:String,
+        default:""
+    },
+    requiredSkills:{
+        type:[String],
+        default:[]
+    }
+},
+{
+    timestamps:true
+});
+module.exports=mongoose.models.Career||mongoose.model("Career",careerSchema);

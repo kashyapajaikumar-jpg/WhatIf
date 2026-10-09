@@ -1,22 +1,63 @@
 const express = require("express");
-
+const jwt = require("jsonwebtoken");
 const Course = require("../models/courseModel");
-
 const router = express.Router();
-
-router.post("/", async(req,res)=>{
-
-    try{
-
+const checkAdmin = (req,res,next) =>
+{
+    try
+    {
+        const token = req.headers.authorization;
+        if(!token)
+        {
+            return res.status(401).json({
+                message:"Access denied. No token provided"
+            });
+        }
+        const decoded = jwt.verify(
+            token.replace("Bearer ",""),
+            process.env.JWT_SECRET
+        );
+        if(decoded.role !== "admin")
+        {
+            return res.status(403).json({
+                message:"Admin access required"
+            });
+        }
+        next();
+    }
+    catch(error)
+    {
+        return res.status(401).json({
+            message:"Invalid or expired token"
+        });
+    }
+};
+router.get("/", async(req,res) =>
+{
+    try
+    {
+        const courses = await Course.find();
+        res.status(200).json(courses);
+    }
+    catch(error)
+    {
+        res.status(500).json({
+            message:"Failed to fetch courses",
+            error:error.message
+        });
+    }
+});
+router.post("/", checkAdmin, async(req,res) =>
+{
+    try
+    {
         const {name,description,category,duration,source} = req.body;
-
         if(!name || !description || !category || !duration)
         {
             return res.status(400).json({
                 message:"Please fill all the required fields"
             });
         }
-
         const newCourse = new Course({
             name,
             description,
@@ -24,56 +65,31 @@ router.post("/", async(req,res)=>{
             duration,
             source
         });
-
         await newCourse.save();
-
         res.status(201).json({
             message:"Course added successfully",
             course:newCourse
         });
-
     }
-
     catch(error)
     {
-
         res.status(500).json({
             message:"Course creation failed",
             error:error.message
         });
-
     }
-
 });
-
-router.get("/", async(req,res)=>{
-
-    try{
-
-        const courses = await Course.find();
-
-        res.status(200).json(courses);
-
-    }
-
-    catch(error)
+router.put("/:id", checkAdmin, async(req,res) =>
+{
+    try
     {
-
-        res.status(500).json({
-            message:"Failed to fetch courses",
-            error:error.message
-        });
-
-    }
-
-});
-
-router.put("/:id", async(req,res)=>{
-
-    try{
-
         const {name,description,category,duration,source} = req.body;
-
+        if(!name || !description || !category || !duration)
+        {
+            return res.status(400).json({
+                message:"Please fill all the required fields"
+            });
+        }
         const updatedCourse = await Course.findByIdAndUpdate(
             req.params.id,
             {
@@ -83,63 +99,52 @@ router.put("/:id", async(req,res)=>{
                 duration,
                 source
             },
-            {new:true}
+            {
+                new:true
+            }
         );
-
         if(!updatedCourse)
         {
             return res.status(404).json({
                 message:"Course not found"
             });
         }
-
         res.status(200).json({
             message:"Course updated successfully",
             course:updatedCourse
         });
-
     }
-
     catch(error)
     {
-
         res.status(500).json({
             message:"Course update failed",
             error:error.message
         });
-
     }
-
 });
-
-router.delete("/:id", async(req,res)=>{
-
-    try{
-
-        const deletedCourse = await Course.findByIdAndDelete(req.params.id);
-
+router.delete("/:id", checkAdmin, async(req,res) =>
+{
+    try
+    {
+        const deletedCourse = await Course.findByIdAndDelete(
+            req.params.id
+        );
         if(!deletedCourse)
         {
             return res.status(404).json({
                 message:"Course not found"
             });
         }
-
         res.status(200).json({
             message:"Course deleted successfully"
         });
-
     }
-
     catch(error)
     {
-
         res.status(500).json({
             message:"Course deletion failed",
             error:error.message
         });
-
     }
-
 });
 module.exports = router;
