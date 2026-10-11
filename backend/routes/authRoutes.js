@@ -1,85 +1,75 @@
+
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const user = require("../models/userModel");
+const transporter = require("../config/mailer");
+
 const router = express.Router();
 
-const transporter = nodemailer.createTransport(
-{
-    service:"gmail",
-    auth:
-    {
-        user:process.env.EMAIL_USER,
-        pass:process.env.EMAIL_PASSWORD
-    }
-});
+// REGISTER
+router.post("/register", async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
 
-router.post("/register",async(req,res)=>
-{
-    try
-    {
-        const {name,email,password} = req.body;
-
-        if(!name || !email || !password)
-        {
+        if (!name || !email || !password) {
             return res.status(400).json({
-                message:"Please fill all the fields"
+                message: "Please fill all the fields"
             });
         }
 
-        const existingUser = await user.findOne({email});
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingUser = await user.findOne({
+            email: normalizedEmail
+        });
 
-        if(existingUser)
-        {
+        if (existingUser) {
             return res.status(400).json({
-                message:"User already exists"
+                message: "User already exists"
             });
         }
 
-        const hashedPassword = await bcrypt.hash(password,10);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newuser = new user({
+        const newUser = new user({
             name,
-            email,
-            password:hashedPassword
+            email: normalizedEmail,
+            password: hashedPassword
         });
 
-        await newuser.save();
+        await newUser.save();
 
-        res.status(201).json({
-            message:"User registered successfully"
+        return res.status(201).json({
+            message: "User registered successfully"
         });
-    }
-    catch(error)
-    {
-        res.status(500).json({
-            message:"Registration failed",
-            error:error.message
+    } catch (error) {
+        console.error("Registration error:", error.message);
+        return res.status(500).json({
+            message: "Registration failed"
         });
     }
 });
 
-router.post("/login",async(req,res)=>
-{
-    try
-    {
-        const {email,password} = req.body;
+// USER LOGIN
+router.post("/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-        if(!email || !password)
-        {
+        if (!email || !password) {
             return res.status(400).json({
-                message:"Email and password are required"
+                message: "Email and password are required"
             });
         }
 
-        const existingUser = await user.findOne({email});
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingUser = await user.findOne({
+            email: normalizedEmail
+        });
 
-        if(!existingUser)
-        {
+        if (!existingUser) {
             return res.status(400).json({
-                message:"Invalid email or password"
+                message: "Invalid email or password"
             });
         }
 
@@ -88,179 +78,163 @@ router.post("/login",async(req,res)=>
             existingUser.password
         );
 
-        if(!passwordMatch)
-        {
+        if (!passwordMatch) {
             return res.status(400).json({
-                message:"Invalid email or password"
+                message: "Invalid email or password"
             });
         }
 
         const token = jwt.sign(
             {
-                userId:existingUser._id,
-                role:"user"
+                userId: existingUser._id,
+                role: "user"
             },
             process.env.JWT_SECRET,
-            {
-                expiresIn:"1d"
-            }
+            { expiresIn: "1d" }
         );
 
-        res.status(200).json({
-            message:"Login successful",
+        return res.status(200).json({
+            message: "Login successful",
             token,
-            user:
-            {
-                id:existingUser._id,
-                name:existingUser.name,
-                email:existingUser.email
+            user: {
+                id: existingUser._id,
+                name: existingUser.name,
+                email: existingUser.email
             }
         });
-    }
-    catch(error)
-    {
-        res.status(500).json({
-            message:"Login failed",
-            error:error.message
+    } catch (error) {
+        console.error("Login error:", error.message);
+        return res.status(500).json({
+            message: "Login failed"
         });
     }
 });
 
-router.post("/admin-login",async(req,res)=>
-{
-    try
-    {
-        const {email,password} = req.body;
+// ADMIN LOGIN
+router.post("/admin-login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
-        if(!email || !password)
-        {
+        if (!email || !password) {
             return res.status(400).json({
-                message:"Email and password are required"
+                message: "Email and password are required"
             });
         }
 
-        if(
+        if (
             email !== process.env.ADMIN_EMAIL ||
             password !== process.env.ADMIN_PASSWORD
-        )
-        {
+        ) {
             return res.status(401).json({
-                message:"Invalid admin credentials"
+                message: "Invalid admin credentials"
             });
         }
 
         const token = jwt.sign(
-            {
-                role:"admin"
-            },
+            { role: "admin" },
             process.env.JWT_SECRET,
-            {
-                expiresIn:"1d"
-            }
+            { expiresIn: "1d" }
         );
 
-        res.status(200).json({
-            message:"Admin login successful",
+        return res.status(200).json({
+            message: "Admin login successful",
             token,
-            admin:
-            {
+            admin: {
                 email,
-                role:"admin"
+                role: "admin"
             }
         });
-    }
-    catch(error)
-    {
-        res.status(500).json({
-            message:"Admin login failed",
-            error:error.message
+    } catch (error) {
+        console.error("Admin login error:", error.message);
+        return res.status(500).json({
+            message: "Admin login failed"
         });
     }
 });
 
-router.get("/profile",async(req,res)=>
-{
-    try
-    {
-        const token = req.headers.authorization;
+// GET USER PROFILE
+router.get("/profile", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
 
-        if(!token)
-        {
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
-                message:"Access denied. No token provided"
+                message: "Authentication required"
             });
         }
 
         const decoded = jwt.verify(
-            token.replace("Bearer ",""),
+            authHeader.substring(7),
             process.env.JWT_SECRET
         );
 
-        if(decoded.role !== "user")
-        {
+        if (decoded.role !== "user") {
             return res.status(403).json({
-                message:"User access required"
+                message: "User access required"
             });
         }
 
         const existingUser = await user.findById(decoded.userId);
 
-        if(!existingUser)
-        {
+        if (!existingUser) {
             return res.status(404).json({
-                message:"User not found"
+                message: "User not found"
             });
         }
 
-        res.status(200).json({
-            id:existingUser._id,
-            name:existingUser.name,
-            email:existingUser.email,
-            education:existingUser.education,
-            skills:existingUser.skills,
-            interests:existingUser.interests,
-            preferences:existingUser.preferences
+        return res.status(200).json({
+            id: existingUser._id,
+            name: existingUser.name,
+            email: existingUser.email,
+            education: existingUser.education,
+            skills: existingUser.skills,
+            interests: existingUser.interests,
+            preferences: existingUser.preferences
         });
-    }
-    catch(error)
-    {
-        res.status(401).json({
-            message:"Invalid or expired token"
+    } catch (error) {
+        if (
+            error.name === "JsonWebTokenError" ||
+            error.name === "TokenExpiredError"
+        ) {
+            return res.status(401).json({
+                message: "Invalid or expired token"
+            });
+        }
+
+        console.error("Profile error:", error.message);
+        return res.status(500).json({
+            message: "Failed to load profile"
         });
     }
 });
 
-router.put("/profile",async(req,res)=>
-{
-    try
-    {
-        const token = req.headers.authorization;
+// UPDATE USER PROFILE
+router.put("/profile", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
 
-        if(!token)
-        {
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
-                message:"Access denied. No token provided"
+                message: "Authentication required"
             });
         }
 
         const decoded = jwt.verify(
-            token.replace("Bearer ",""),
+            authHeader.substring(7),
             process.env.JWT_SECRET
         );
 
-        if(decoded.role !== "user")
-        {
+        if (decoded.role !== "user") {
             return res.status(403).json({
-                message:"User access required"
+                message: "User access required"
             });
         }
 
         const existingUser = await user.findById(decoded.userId);
 
-        if(!existingUser)
-        {
+        if (!existingUser) {
             return res.status(404).json({
-                message:"User not found"
+                message: "User not found"
             });
         }
 
@@ -272,163 +246,240 @@ router.put("/profile",async(req,res)=>
             interests
         } = req.body;
 
-        if(!name || !email)
-        {
+        if (!name || !email) {
             return res.status(400).json({
-                message:"Name and email are required"
+                message: "Name and email are required"
             });
         }
 
-        const emailOwner = await user.findOne({email});
+        const normalizedEmail = email.trim().toLowerCase();
+        const emailOwner = await user.findOne({
+            email: normalizedEmail
+        });
 
-        if(
+        if (
             emailOwner &&
             emailOwner._id.toString() !== existingUser._id.toString()
-        )
-        {
+        ) {
             return res.status(400).json({
-                message:"Email is already in use"
+                message: "Email is already in use"
             });
         }
 
         existingUser.name = name;
-        existingUser.email = email;
+        existingUser.email = normalizedEmail;
         existingUser.education = education || "";
         existingUser.skills = Array.isArray(skills) ? skills : [];
         existingUser.interests = Array.isArray(interests) ? interests : [];
 
         await existingUser.save();
 
-        res.status(200).json({
-            id:existingUser._id,
-            name:existingUser.name,
-            email:existingUser.email,
-            education:existingUser.education,
-            skills:existingUser.skills,
-            interests:existingUser.interests,
-            preferences:existingUser.preferences
+        return res.status(200).json({
+            id: existingUser._id,
+            name: existingUser.name,
+            email: existingUser.email,
+            education: existingUser.education,
+            skills: existingUser.skills,
+            interests: existingUser.interests,
+            preferences: existingUser.preferences
         });
-    }
-    catch(error)
-    {
-        res.status(401).json({
-            message:"Invalid or expired token"
+    } catch (error) {
+        if (
+            error.name === "JsonWebTokenError" ||
+            error.name === "TokenExpiredError"
+        ) {
+            return res.status(401).json({
+                message: "Invalid or expired token"
+            });
+        }
+
+        console.error("Update profile error:", error.message);
+        return res.status(500).json({
+            message: "Failed to update profile"
         });
     }
 });
 
-router.post("/forgot-password",async(req,res)=>
-{
-    try
-    {
-        const {email} = req.body;
+// FORGOT PASSWORD — SEND RESET EMAIL
+router.post("/forgot-password", async (req, res) => {
+    let existingUser;
 
-        if(!email)
-        {
+    try {
+        const { email } = req.body;
+
+        if (!email || !email.trim()) {
             return res.status(400).json({
-                message:"Email is required"
+                message: "Email is required"
             });
         }
 
-        const existingUser = await user.findOne({email});
+        const normalizedEmail = email.trim().toLowerCase();
 
-        if(!existingUser)
-        {
+        existingUser = await user.findOne({
+            email: normalizedEmail
+        });
+
+        if (!existingUser) {
             return res.status(404).json({
-                message:"User not found"
+                message: "No account found with this email address"
             });
         }
 
         const resetToken = crypto.randomBytes(32).toString("hex");
 
         existingUser.resetPasswordToken = resetToken;
-        existingUser.resetPasswordExpires =
-            new Date(Date.now() + 15 * 60 * 1000);
+        existingUser.resetPasswordExpires = new Date(
+            Date.now() + 15 * 60 * 1000
+        );
 
         await existingUser.save();
 
         const resetLink =
-            `http://localhost:5173/reset?email=${encodeURIComponent(email)}&token=${resetToken}`;
+            `http://localhost:5173/reset?email=${encodeURIComponent(normalizedEmail)}&token=${resetToken}`;
 
-        await transporter.sendMail(
-        {
-            from:process.env.EMAIL_USER,
-            to:email,
-            subject:"WHAT IF? Password Reset",
-            html:
-            `
-            <h2>WHAT IF? Password Reset</h2>
-            <p>You requested a password reset.</p>
-            <p>Use the following link to reset your password:</p>
-            <a href="${resetLink}">${resetLink}</a>
-            <p>This link will expire in 15 minutes.</p>
+        await transporter.sendMail({
+            from: `"WHAT IF?" <${process.env.EMAIL_USER}>`,
+            to: normalizedEmail,
+            subject: "WHAT IF? Password Reset",
+            text: `You requested a password reset. Open this link within 15 minutes: ${resetLink}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto;">
+                    <h2>WHAT IF? Password Reset</h2>
+                    <p>You requested a password reset for your account.</p>
+                    <p>Click the button below to choose a new password.
+                       This link expires in 15 minutes.</p>
+                    <p>
+                        <a href="${resetLink}"
+                           style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;">
+                            Reset my password
+                        </a>
+                    </p>
+                    <p>If the button doesn't work, copy this link into your browser:</p>
+                    <p>${resetLink}</p>
+                    <p>If you didn't request this, you can ignore this email.</p>
+                </div>
             `
         });
 
-        res.status(200).json({
-            message:"Password reset link sent to your email"
+        return res.status(200).json({
+            message: "Password reset link sent to your email"
         });
-    }
-    catch(error)
-    {
-        res.status(500).json({
-            message:"Forgot password failed",
-            error:error.message
+    } catch (error) {
+        console.error("Forgot password error:", error.message);
+
+        // Invalidate the token if the email could not be sent.
+        if (existingUser) {
+            try {
+                existingUser.resetPasswordToken = "";
+                existingUser.resetPasswordExpires = null;
+                await existingUser.save();
+            } catch (saveError) {
+                console.error("Could not clear reset token:", saveError.message);
+            }
+        }
+
+        return res.status(500).json({
+            message: "Could not send the password reset email. Check your email configuration."
         });
     }
 });
 
-router.post("/reset-password",async(req,res)=>
-{
-    try
-    {
+// RESET PASSWORD
+router.post("/reset-password", async (req, res) => {
+    try {
         const {
             email,
             resetToken,
             newPassword
         } = req.body;
 
-        if(!email || !resetToken || !newPassword)
-        {
+        if (!email || !resetToken || !newPassword) {
             return res.status(400).json({
-                message:"Email, reset token and new password are required"
+                message: "Email, reset token and new password are required"
             });
         }
 
-        const existingUser = await user.findOne(
-        {
-            email,
-            resetPasswordToken:resetToken,
-            resetPasswordExpires:{$gt:new Date()}
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                message: "Password must be at least 8 characters long"
+            });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const existingUser = await user.findOne({
+            email: normalizedEmail,
+            resetPasswordToken: resetToken,
+            resetPasswordExpires: { $gt: new Date() }
         });
 
-        if(!existingUser)
-        {
+        if (!existingUser) {
             return res.status(400).json({
-                message:"Invalid or expired reset token"
+                message: "Invalid or expired reset token"
             });
         }
 
-        const hashedPassword = await bcrypt.hash(
-            newPassword,
-            10
-        );
-
-        existingUser.password = hashedPassword;
+        existingUser.password = await bcrypt.hash(newPassword, 10);
         existingUser.resetPasswordToken = "";
         existingUser.resetPasswordExpires = null;
 
         await existingUser.save();
 
-        res.status(200).json({
-            message:"Password reset successfully"
+        return res.status(200).json({
+            message: "Password reset successfully"
+        });
+    } catch (error) {
+        console.error("Reset password error:", error.message);
+        return res.status(500).json({
+            message: "Password reset failed"
         });
     }
-    catch(error)
-    {
-        res.status(500).json({
-            message:"Password reset failed",
-            error:error.message
+});
+
+// ADMIN: GET ALL REGISTERED USERS
+router.get("/admin/users", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
+                message: "Authentication required"
+            });
+        }
+
+        const decoded = jwt.verify(
+            authHeader.substring(7),
+            process.env.JWT_SECRET
+        );
+
+        if (decoded.role !== "admin") {
+            return res.status(403).json({
+                message: "Admin access required"
+            });
+        }
+
+        const users = await user.find({})
+            .select("name email education skills interests createdAt")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.status(200).json({
+            total: users.length,
+            users
+        });
+    } catch (error) {
+        if (
+            error.name === "JsonWebTokenError" ||
+            error.name === "TokenExpiredError"
+        ) {
+            return res.status(401).json({
+                message: "Invalid or expired token"
+            });
+        }
+
+        console.error("Admin users error:", error.message);
+        return res.status(500).json({
+            message: "Failed to load users"
         });
     }
 });
