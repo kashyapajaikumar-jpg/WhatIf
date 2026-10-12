@@ -8,7 +8,7 @@ const transporter = require("../config/mailer");
 
 const router = express.Router();
 
-// REGISTER
+
 router.post("/register", async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -152,7 +152,7 @@ router.post("/admin-login", async (req, res) => {
     }
 });
 
-// GET USER PROFILE
+
 router.get("/profile", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -208,7 +208,7 @@ router.get("/profile", async (req, res) => {
     }
 });
 
-// UPDATE USER PROFILE
+// Uupdate userprofile
 router.put("/profile", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -300,7 +300,7 @@ router.put("/profile", async (req, res) => {
     }
 });
 
-// FORGOT PASSWORD — SEND RESET EMAIL
+// to send mai for resetting password
 router.post("/forgot-password", async (req, res) => {
     let existingUser;
 
@@ -367,7 +367,7 @@ router.post("/forgot-password", async (req, res) => {
     } catch (error) {
         console.error("Forgot password error:", error.message);
 
-        // Invalidate the token if the email could not be sent.
+        
         if (existingUser) {
             try {
                 existingUser.resetPasswordToken = "";
@@ -384,7 +384,7 @@ router.post("/forgot-password", async (req, res) => {
     }
 });
 
-// RESET PASSWORD
+
 router.post("/reset-password", async (req, res) => {
     try {
         const {
@@ -436,7 +436,7 @@ router.post("/reset-password", async (req, res) => {
     }
 });
 
-// ADMIN: GET ALL REGISTERED USERS
+// this is for admin to get user or see em
 router.get("/admin/users", async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
