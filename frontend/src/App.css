@@ -1,5 +1,4 @@
 
-/* WHAT IF Scenario Page */
 .scenario-page{max-width:1180px;margin:0 auto;padding-bottom:64px}
 .scenario-page-header{margin-bottom:28px}
 .scenario-page-header h1{letter-spacing:-.055em}
@@ -65,4 +64,5 @@
 .scenario-result-actions{margin-top:22px}
 .scenario-result-actions>button:first-child{display:inline-flex;align-items:center;gap:12px;border:0;border-radius:999px;padding:14px 20px;background:#111;color:#fff;font:inherit;font-size:12px;font-weight:700}
 .scenario-result-actions>button:first-child:hover{background:#333}
+.scenario-result-actions>button:disabled{opacity:.65;cursor:not-allowed}
 @media(max-width:760px){.scenario-title-row,.scenario-result-heading{flex-direction:column}.scenario-title-mark{white-space:normal}.scenario-form{grid-template-columns:1fr}.scenario-skills-field,.scenario-error,.scenario-actions{grid-column:auto}.scenario-summary-grid{grid-template-columns:1fr}.scenario-next-steps,.scenario-project-grid{grid-template-columns:1fr}.scenario-result{padding:20px}.scenario-label{white-space:normal}.scenario-section-heading{flex-direction:column}.scenario-empty-state{align-items:flex-start;padding:18px}}
